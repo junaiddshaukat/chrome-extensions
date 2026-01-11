@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>GitHub Issue Reminder</title>
+  <link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h2>Tracked Repositories</h2>
+    <div class="input-group">
+      <input type="text" id="repoInput" placeholder="owner/repo (e.g. facebook/react)">
+      <button id="addBtn">Add</button>
+    </div>
+    <button id="checkNowBtn" style="width: 100%; margin-top: 10px; background-color: #0366d6;">Check for Issues Now</button>
+    <ul id="repoList"></ul>
+    <div id="message"></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
