@@ -24,6 +24,56 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+// Retry logic with exponential backoff
+async function fetchWithRetry(url, headers, maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, { headers });
+      
+      // Check rate limit headers
+      const rateLimitRemaining = response.headers.get('X-RateLimit-Remaining');
+      const rateLimitReset = response.headers.get('X-RateLimit-Reset');
+      
+      // Handle rate limiting (429 or 403 with rate limit = 0)
+      if (response.status === 429 || (response.status === 403 && rateLimitRemaining === '0')) {
+        const resetTime = rateLimitReset ? parseInt(rateLimitReset) * 1000 : Date.now() + 60000;
+        const waitTime = Math.min(resetTime - Date.now(), 60000); // Max 60 seconds wait
+        
+        if (attempt < maxRetries - 1 && waitTime > 0) {
+          console.log(`Rate limit hit. Waiting ${Math.round(waitTime / 1000)}s before retry ${attempt + 2}/${maxRetries}...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        } else {
+          throw new Error(`Rate limit exceeded. Reset at ${new Date(resetTime).toLocaleTimeString()}`);
+        }
+      }
+      
+      // Handle other errors
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error(`Access forbidden. Repository may be private or token invalid.`);
+        } else if (response.status === 404) {
+          throw new Error(`Repository not found.`);
+        } else {
+          throw new Error(`HTTP ${response.status}`);
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      // If it's the last attempt or not a rate limit error, throw
+      if (attempt === maxRetries - 1 || !error.message.includes('Rate limit')) {
+        throw error;
+      }
+      
+      // Exponential backoff for other errors
+      const backoffTime = Math.min(1000 * Math.pow(2, attempt), 10000);
+      console.log(`Request failed. Retrying in ${backoffTime}ms... (${attempt + 2}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, backoffTime));
+    }
+  }
+}
+
 async function checkIssues() {
   try {
     const { repos } = await chrome.storage.sync.get(['repos']);
@@ -44,13 +94,22 @@ async function checkIssues() {
 
       try {
         const url = `https://api.github.com/repos/${repo}/issues?since=${lastCheck}&state=all`;
-        const response = await fetch(url);
         
-        if (!response.ok) {
-            console.error(`Error fetching ${repo}: ${response.status}`);
-            continue;
+        // Get GitHub token if available
+        const { githubToken } = await chrome.storage.sync.get(['githubToken']);
+        
+        // Build headers - User-Agent is required by GitHub API
+        const headers = {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'GitHub-Issue-Reminder-Extension'
+        };
+        
+        // Add authentication if token is available
+        if (githubToken) {
+          headers['Authorization'] = `token ${githubToken}`;
         }
-
+        
+        const response = await fetchWithRetry(url, headers);
         const issues = await response.json();
 
         // Filter for issues created after the last check
@@ -88,7 +147,8 @@ async function checkIssues() {
         }
 
       } catch (error) {
-        console.error(`Failed to check ${repo}:`, error);
+        console.error(`Failed to check ${repo}:`, error.message);
+        // Don't update lastCheck on error, so we retry next time
       }
     }
 
@@ -103,7 +163,7 @@ function createNotification(repo, issue) {
   const notificationId = `issue-${issue.id}`;
   chrome.notifications.create(notificationId, {
     type: 'basic',
-    iconUrl: 'icons/icon48.png',
+    iconUrl: chrome.runtime.getURL('icons/icon48.png'),
     title: `New Issue in ${repo}`,
     message: issue.title,
     contextMessage: `By ${issue.user.login}`,

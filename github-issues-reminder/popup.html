@@ -1,19 +1,43 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>GitHub Issue Reminder</title>
+  <meta charset="UTF-8">
+  <title>GitHub Issues</title>
   <link rel="stylesheet" type="text/css" href="styles.css">
 </head>
 <body>
   <div class="container">
-    <h2>Tracked Repositories</h2>
-    <div class="input-group">
-      <input type="text" id="repoInput" placeholder="owner/repo (e.g. facebook/react)">
-      <button id="addBtn">Add</button>
+    <h2>GitHub Issues</h2>
+    
+    <div class="section">
+      <div class="input-group">
+        <input type="text" id="repoInput" placeholder="owner/repo">
+        <button id="addBtn">Add</button>
+      </div>
+      <button id="checkNowBtn" class="check-now-btn">Check Now</button>
+      <ul id="repoList"></ul>
+      <div id="message"></div>
     </div>
-    <button id="checkNowBtn" style="width: 100%; margin-top: 10px; background-color: #0366d6;">Check for Issues Now</button>
-    <ul id="repoList"></ul>
-    <div id="message"></div>
+
+    <div class="section token-section">
+      <label for="tokenInput">GitHub Token</label>
+      <div class="subtitle">Optional • Higher limits & private repos</div>
+      <div class="input-group">
+        <input type="password" id="tokenInput" placeholder="ghp_...">
+        <button id="saveTokenBtn">Save</button>
+      </div>
+      <button id="removeTokenBtn" class="remove-token-btn">Remove Token</button>
+      <p>
+        <a href="https://github.com/settings/tokens" target="_blank">Create token</a> • No scopes needed
+      </p>
+      
+      <div class="trust-message">
+        <span class="trust-message-icon">🔒</span>
+        <div class="trust-message-text">
+          <strong>Stored locally</strong> on your device only. Never sent to servers.
+        </div>
+      </div>
+    </div>
   </div>
   <script src="popup.js"></script>
 </body>
